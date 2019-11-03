@@ -25,9 +25,8 @@ class UneAuPair:
     def __init__(self):
         self.prenom = ''
     def __eq__(self, other):
-        """Comparaison de deux notes"""
-        return self.prenom == other.prenom \
-           and self.url == other.url
+        """Comparaison de deux au pair"""
+        return self.url == other.url
     def toString(self, sep):
         """Format du dump fichier"""
         return self.prenom \
@@ -58,7 +57,7 @@ def readField( champ, bulletProof ):
     returnMe = returnMe.replace("'", "")
     return returnMe
 
-def extractDetail(maSession, uneAuPair, spamTodo):
+def extractDetail(maSession, uneAuPair, spamTodo,messageType):
     extractOk = True
     try:
         r = maSession.get(uneAuPair.url, headers=headers, proxies=proxies, verify=False)
@@ -73,6 +72,7 @@ def extractDetail(maSession, uneAuPair, spamTodo):
         soup = BeautifulSoup(r.content, "html.parser")
 
         formPersonal = soup.find('form', action='/send-user-personal-mail-db.php')
+        memberIdPersonal = ""
         if ( formPersonal ):
             memberIdPersonal = formPersonal.find('input', {'name': 'memberId'}).get('value')
 
@@ -83,14 +83,14 @@ def extractDetail(maSession, uneAuPair, spamTodo):
 
         now = datetime.now() # current date and time
         if ( spamTodo ):
-            sendMessage(maSession,memberId,memberIdPersonal)
+            sendMessage(maSession,memberId,memberIdPersonal,messageType)
             uneAuPair.status = 'oui'
             uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
 
-def sendMessage(maSession,memberId,memberIdPersonal):
+def sendMessage(maSession,memberId,memberIdPersonal,messageType):
     memberId = False
     if (memberId):
-        payload = "memberId=" + requote_uri(memberId) + "&visaAllowed=1&message=Hello%2C%0Awe%20would%20love%20to%20hear%20about%20you%20to%20see%20if%20you%20could%20be%20interested%20in%20living%20with%20us%20%21%0AWe%20have%20two%20kids%20at%20home%20during%20the%20day%2C%20Elise%20who%20is%20nearly%204%20and%20Raphael%20nearly%2010%20%28the%20others%20are%2011%2C%2014%20and%2016%20and%20take%20care%20of%20themselves%29.%0AThey%20were%20in%20a%20Montessori%20school%20last%20year%20but%20the%20teachers%20were%20not%20like%20we%20hoped%20so%20we%20are%20homeschooling%20them%20both%20this%20year.%0A%0AWe%20live%20in%20a%20beautiful%20place%20in%20east%20France%20and%20would%20love%20to%20show%20you%20our%20country%20and%20around.%0APlease%20let%20us%20know%20if%20you%20could%20be%20interested.%0AKind%20regards%0AMagali&freeRequest=Envoyer"
+        payload = "memberId=" + requote_uri(memberId) + "&visaAllowed=1&message=" + messageType + "&freeRequest=Envoyer"
         headers = {'content-type': 'application/x-www-form-urlencoded'}
 
         r = maSession.post("https://www.aupair.com/personal-message-db.php", data=payload, headers=headers, proxies=proxies, verify=False)
@@ -98,7 +98,7 @@ def sendMessage(maSession,memberId,memberIdPersonal):
         print("message-db",r.status_code, r.reason)
 
     if (memberIdPersonal):
-        payload = "memberId=" + requote_uri(memberIdPersonal) + "&message=Hello%2C%0Awe%20would%20love%20to%20hear%20about%20you%20to%20see%20if%20you%20could%20be%20interested%20in%20living%20with%20us%20%21%0AWe%20have%20two%20kids%20at%20home%20during%20the%20day%2C%20Elise%20who%20is%20nearly%204%20and%20Raphael%20nearly%2010%20%28the%20others%20are%2011%2C%2014%20and%2016%20and%20take%20care%20of%20themselves%29.%0AThey%20were%20in%20a%20Montessori%20school%20last%20year%20but%20the%20teachers%20were%20not%20like%20we%20hoped%20so%20we%20are%20homeschooling%20them%20both%20this%20year.%0A%0AWe%20live%20in%20a%20beautiful%20place%20in%20east%20France%20and%20would%20love%20to%20show%20you%20our%20country%20and%20around.%0APlease%20let%20us%20know%20if%20you%20could%20be%20interested.%0AKind%20regards%0AMagali&Submit=Envoyer"
+        payload = "memberId=" + requote_uri(memberIdPersonal) + "&message=" + messageType + "&Submit=Envoyer"
         headers = {'content-type': 'application/x-www-form-urlencoded'}
 
         r = maSession.post("https://www.aupair.com/send-user-personal-mail-db.php", data=payload, headers=headers, proxies=proxies, verify=False)
@@ -168,6 +168,7 @@ if __name__ == "__main__":
     parser.add_argument('--pwd', help='Password', type=str)
     parser.add_argument('--proxy', help='https://uzer:pwd@name:port', type=str, default="")
     parser.add_argument('--spam', help='true', type=str, default="")
+    parser.add_argument('--path', help='true', type=str, default="")
     args=parser.parse_args()
 
     if args.proxy:
@@ -176,8 +177,9 @@ if __name__ == "__main__":
             "https": str(args.proxy)
         }
 
-    #print(str(args.user) + "//" + urllib.parse.quote(str(args.user)) )
+    #print(str(args.path))
 
+    rootPath = args.path
     payload = "userNameF=" + urllib.parse.quote(str(args.user)) + "&passwordF=" + str(args.pwd) + "&login=Login+%C2%BB"
     headers = {'content-type': 'application/x-www-form-urlencoded'}
 
@@ -195,17 +197,25 @@ if __name__ == "__main__":
     if r.status_code != 200:
         print(r.status_code, r.reason)
 
-    print("Generation des fichiers ici : [" + os.getcwd() + "]")
+    print("Generation des fichiers ici : [" + rootPath + "]")
 
     encoreAuPair = True
     pageAuPair = 0
 
     nouveauFichier = True
 
-    nomFichierHistorique = "d:/Documents/[Mes Documents]/Gestion/AuPair/aupair.com.csv"
-    nomFichierNouveau = "d:/Documents/[Mes Documents]/Gestion/AuPair/aupair.new.csv"
-    nomFichierNouveauTotal = "d:/Documents/[Mes Documents]/Gestion/AuPair/aupair.new.total.csv"
-    nomFichierHistoriqueBackup = "d:/Documents/[Mes Documents]/Gestion/AuPair/aupair.com.backup.csv"
+    nomFichierMessage = rootPath + "/message.txt"
+    nomFichierHistorique = rootPath + "/aupair.com.csv"
+    nomFichierNouveau = rootPath + "/aupair.new.csv"
+    nomFichierNouveauTotal = rootPath + "/aupair.new.total.csv"
+    nomFichierHistoriqueBackup = rootPath + "/aupair.com.backup.csv"
+
+    messageType = ''
+    with open(nomFichierMessage, 'r') as file:
+        messageType = file.read()
+        messageType = urllib.parse.quote(messageType)
+
+    print(messageType)
 
     auPairDuFichier = []
 
@@ -286,7 +296,7 @@ if __name__ == "__main__":
     spamTodo = True
     for uneAuPair in auPairDuFichier:
         if ( uneAuPair.status == 'todo'):
-            extractDetail(maSession,uneAuPair,spamTodo)
+            extractDetail(maSession,uneAuPair,spamTodo,messageType)
 
     with open(nomFichierNouveauTotal, "w") as n:
         n.write(
