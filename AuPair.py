@@ -1,3 +1,7 @@
+#!/usr/bin/python2.6
+
+# coding: utf-8
+
 import requests
 import argparse
 from bs4 import BeautifulSoup
