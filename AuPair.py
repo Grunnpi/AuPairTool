@@ -1,5 +1,4 @@
 #!/usr/bin/python2.6
-
 # -*- coding: utf-8 -*-
 
 import requests
@@ -10,6 +9,9 @@ import csv
 import os
 from datetime import datetime
 import urllib.parse
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 proxies = {}
 
@@ -225,9 +227,9 @@ if __name__ == "__main__":
 
     if ( os.path.isfile(nomFichierHistorique) ):
         nouveauFichier = False
-        # lire les notes déjà presente si existe
+        # lire les notes presente si existe
         line_count = 0
-        with open(nomFichierHistorique) as csv_file:
+        with open(nomFichierHistorique, encoding='latin-1') as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=sep)
             for row in csv_reader:
                 uneAuPair = UneAuPair()
@@ -297,7 +299,7 @@ if __name__ == "__main__":
     print("Fin extraction : " + str(compteNouvelle) + " nouveaux profiles pour " + str(compteTotal) + " recupérés du site\n Total inventaire " + str(len(auPairDuFichier)))
 
     #spam
-    spamTodo = True
+    spamTodo = False
     for uneAuPair in auPairDuFichier:
         if ( uneAuPair.status == 'todo'):
             extractDetail(maSession,uneAuPair,spamTodo,messageType)
