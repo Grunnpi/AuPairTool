@@ -1,6 +1,3 @@
-#!/usr/bin/python2.6
-# -*- coding: utf-8 -*-
-
 import requests
 import argparse
 from bs4 import BeautifulSoup
@@ -10,6 +7,9 @@ import os
 from datetime import datetime
 import urllib.parse
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -28,11 +28,18 @@ class UneAuPair:
     quandPong = ''
     commentaire = ''
     url = ''
+    googleLine = -1
+    googleStatus = 'new'
     def __init__(self):
         self.prenom = ''
     def __eq__(self, other):
         """Comparaison de deux au pair"""
         return self.url == other.url
+    def updated(self):
+        if ( self.googleStatus != 'new' ):
+            self.googleStatus = 'update'
+    def isToSync(self):
+        return ( self.googleStatus == 'new' or self.googleStatus == 'update' )
     def toString(self, sep):
         """Format du dump fichier"""
         return self.prenom \
@@ -92,6 +99,7 @@ def extractDetail(maSession, uneAuPair, spamTodo,messageType):
             sendMessage(maSession,memberId,memberIdPersonal,messageType)
             uneAuPair.status = 'oui'
             uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
+            uneAuPair.updated()
 
 def sendMessage(maSession,memberId,memberIdPersonal,messageType):
     memberId = False
@@ -111,14 +119,11 @@ def sendMessage(maSession,memberId,memberIdPersonal,messageType):
         #if r.status_code != 200:
         print("send-user",r.status_code, r.reason)
 
-    #<form method="post" action="/personal-message-db.php">
-    #https://www.aupair.com/send-user-personal-mail-db.php
-    #memberId=1430596&message=Hello%2C%0D%0Awe+would+love+to+hear+about+you+to+see+if+you+could+be+interested+in+living+with+us+%21%0D%0AWe+have+two+kids+at+home+during+the+day%2C+Elise+who+is+nearly+4+and+Raphael+nearly+10+%28the+others+are+11%2C+14+and+16+and+take+care+of+themselves%29.%0D%0AThey+were+in+a+Montessori+school+last+year+but+the+teachers+were+not+like+we+hoped+so+we+are+homeschooling+them+both+this+year.%0D%0A%0D%0AWe+live+in+a+beautiful+place+in+east+France+and+would+love+to+show+you+our+country+and+around.%0D%0APlease+let+us+know+if+you+could+be+interested.%0D%0AKind+regards%0D%0AMagali&Submit=Envoyer
-
-# fonction pour lister toutes les notes d'un eleve sur base de son ID
-def extractionPage(maSession, n, page_number,auPairDuSite):
-    headersNotes = { 'content-type': 'text/html; charset=utf-8' \
-        , 'Sec-Fetch-Mode': 'navigate' \
+# extract search page summary info
+def extractionPage(maSession, page_number,auPairDuSite):
+    headersNotes = { \
+        'content-type': 'text/html; charset=utf-8' , \
+         'Sec-Fetch-Mode': 'navigate' \
         , 'Sec-Fetch-Site': 'same-origin' \
         , 'Sec-Fetch-User': '?1' \
     }
@@ -126,17 +131,21 @@ def extractionPage(maSession, n, page_number,auPairDuSite):
     r = maSession.get("https://www.aupair.com/find_aupair.php?quick_search=search&language=fr&page=" + str(page_number), headers=headersNotes, proxies=proxies, verify=False)
     if r.status_code != 200:
         print(r.status_code, r.reason)
+    # else:
+    #     print(r.content)
 
     print("*** Extraction page " + str(page_number))
 
     soup = BeautifulSoup(r.content, "html.parser")
-    mydivs = soup.findAll("div", {"class": "search_result_box aupairList"})
+    mydivs = soup.findAll("div", {"class": "search_result_box aupairList boxNew"})
 
     compteAuPair = 0
-    #<div class="search_result_box aupairList">
+    now = datetime.now() # current date and time
+    #    #<div class="search_result_box aupairList">
     for auPair in mydivs:
         uneAuPair = UneAuPair()
         uneAuPair.status = 'todo'
+        uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
         compteAuPair = compteAuPair + 1
         # if ( auPair.find("h4").find("b") ):
         #     print(auPair.find("h4").find("b"))
@@ -160,7 +169,7 @@ def extractionPage(maSession, n, page_number,auPairDuSite):
                 nope = False
                 #print(unLabel.next_element.next_element.next_element.text.strip())
         #print(auPair)
-        n.write(uneAuPair.toString(sep) + '\n')
+        # n.write(uneAuPair.toString(sep) + '\n')
         auPairDuSite.append(uneAuPair)
         #break # break pour 1 par page
     return compteAuPair
@@ -203,81 +212,66 @@ if __name__ == "__main__":
     if r.status_code != 200:
         print(r.status_code, r.reason)
 
-    print("Generation des fichiers ici : [" + rootPath + "]")
+    print("Auth ok to auPair.com")
 
     encoreAuPair = True
     pageAuPair = 0
 
-    nouveauFichier = True
+    # use creds to create a client to interact with the Google Drive API
+    scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('../AuPair.json', scope)
+    client = gspread.authorize(creds)
 
-    nomFichierMessage = rootPath + "/message.txt"
-    nomFichierHistorique = rootPath + "/aupair.com.csv"
-    nomFichierNouveau = rootPath + "/aupair.new.csv"
-    nomFichierNouveauTotal = rootPath + "/aupair.new.total.csv"
-    nomFichierHistoriqueBackup = rootPath + "/aupair.com.backup.csv"
+    # Find a workbook by name and open the first sheet
+    # Make sure you use the right name here.
+    auPairSheet = client.open("AuPair").worksheet("AuPair.com")
+    messageSheet = client.open("AuPair").worksheet("Message")
 
-    messageType = ''
-    with open(nomFichierMessage, 'r') as file:
-        messageType = file.read()
-        messageType = urllib.parse.quote(messageType)
+    messageType = messageSheet.cell(1,1).value
+    messageType = urllib.parse.quote(messageType)
 
-    print(messageType)
+    # Extract and print all of the values
+    auPairFromGoogle = []
+    list_of_hashes = auPairSheet.get_all_records()
 
-    auPairDuFichier = []
+    currentGoogleLine = 2 # header++
+    for rec in list_of_hashes:
+        uneAuPair = UneAuPair()
+        for item in rec.items():
+            # print(item[0], " -- ", item[1], "<", item, ">",)
+            if ( item[0] == 'Who'):
+                uneAuPair.prenom = readField(item[1], False)
+            if ( item[0] == 'Where'):
+                uneAuPair.nationalite = readField(item[1], False)
+            if ( item[0] == 'Age'):
+                uneAuPair.age = readField(item[1], False)
+            if ( item[0] == 'Ping'):
+                uneAuPair.status = readField(item[1], False)
+            if ( item[0] == 'WhenPing'):
+                uneAuPair.quandStatus = readField(item[1], False)
+            if ( item[0] == 'Pong'):
+                uneAuPair.pong = readField(item[1], False)
+            if ( item[0] == 'WhenPong'):
+                uneAuPair.quandPong = readField(item[1], False)
+            if ( item[0] == 'Comment'):
+                uneAuPair.commentaire = readField(item[1], False)
+            if ( item[0] == 'URL'):
+                uneAuPair.url = readField(item[1], False)
+        uneAuPair.googleLine = currentGoogleLine
+        currentGoogleLine = currentGoogleLine + 1
+        uneAuPair.googleStatus = 'nope'
+        auPairFromGoogle.append(uneAuPair)
 
-    if ( os.path.isfile(nomFichierHistorique) ):
-        nouveauFichier = False
-        # lire les notes presente si existe
-        line_count = 0
-        with open(nomFichierHistorique, encoding='latin-1') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=sep)
-            for row in csv_reader:
-                uneAuPair = UneAuPair()
-                if line_count == 0:
-                    #print(f'Column names are {", ".join(row)}')
-                    line_count += 1
-                else:
-                    #print(f'\t{row[0]}  sur ligne {line_count}.')
-                    uneAuPair.prenom = readField(row[0], False)
-                    uneAuPair.nationalite = readField(row[1], False)
-                    uneAuPair.age = readField(row[2], False)
-                    uneAuPair.status = readField(row[3], False)
-                    uneAuPair.quandStatus = readField(row[4], False)
-                    uneAuPair.pong = readField(row[5], False)
-                    uneAuPair.quandPong = readField(row[6], False)
-                    uneAuPair.commentaire = readField(row[7], False)
-                    uneAuPair.url = readField(row[8], False)
-
-                    auPairDuFichier.append(uneAuPair)
-                    line_count += 1
-
-
+    print("Nb AuPair from Google %s" % len(auPairFromGoogle))
+    googleNextRow = len(auPairFromGoogle) + 2 # header + new row
     auPairDuSite = []
-    with open(nomFichierNouveau, "w") as n:
-        if (nouveauFichier):
-            n.write(
-                'Qui'
-                + sep + 'Ou'
-                + sep + 'Age'
-                + sep + 'Contacté'
-                + sep + 'Quand'
-                + sep + 'Pong'
-                + sep + 'Quand'
-                + sep + 'Commentaire'
-                + sep + 'URL'
-                + "\n"
-            )
 
-        while( encoreAuPair ):
-            compte = extractionPage(maSession, n, pageAuPair,auPairDuSite)
-            encoreAuPair = (compte > 0)
-            pageAuPair = pageAuPair + 1
-
-        n.close()
+    while( encoreAuPair ):
+        compte = extractionPage(maSession, pageAuPair,auPairDuSite)
+        encoreAuPair = (compte > 0)
+        pageAuPair = pageAuPair + 1
 
     # pour utilisation sans fetch du site, seulement les status du fichie existant
-    #auPairDuSite = []
-
     auPairNouvelleDuSite = []
 
     compteTotal = 0
@@ -285,7 +279,7 @@ if __name__ == "__main__":
     for uneAuPairSite in auPairDuSite:
         compteTotal = compteTotal + 1
         existeDeja = False
-        for uneAuPairHistorique in auPairDuFichier:
+        for uneAuPairHistorique in auPairFromGoogle:
             if ( uneAuPairHistorique == uneAuPairSite):
                 existeDeja = True
                 break
@@ -293,36 +287,34 @@ if __name__ == "__main__":
             auPairNouvelleDuSite.append(uneAuPairSite)
             compteNouvelle = compteNouvelle + 1
         else:
-            uneAuPairHistorique.age = uneAuPairSite.age
+            if ( uneAuPairHistorique.age != uneAuPairSite.age ):
+                uneAuPairHistorique.age = uneAuPairSite.age
+                uneAuPairHistorique.updated()
 
-    auPairDuFichier.extend(auPairNouvelleDuSite)
-    print("Fin extraction : " + str(compteNouvelle) + " nouveaux profiles pour " + str(compteTotal) + " recupérés du site\n Total inventaire " + str(len(auPairDuFichier)))
+    auPairFromGoogle.extend(auPairNouvelleDuSite)
+    print("Fin extraction : " + str(compteNouvelle) + " nouveaux profiles pour " + str(compteTotal) + " recupérés du site\n Total inventaire " + str(len(auPairFromGoogle)))
 
     #spam
-    spamTodo = False
-    for uneAuPair in auPairDuFichier:
+    spamTodo = True
+    for uneAuPair in auPairFromGoogle:
         if ( uneAuPair.status == 'todo'):
             extractDetail(maSession,uneAuPair,spamTodo,messageType)
 
-    with open(nomFichierNouveauTotal, "w") as n:
-        n.write(
-            'Qui'
-            + sep + 'Ou'
-            + sep + 'Age'
-            + sep + 'Contacté'
-            + sep + 'Quand'
-            + sep + 'Pong'
-            + sep + 'Quand'
-            + sep + 'Commentaire'
-            + sep + 'URL'
-            + "\n"
-        )
-        for uneAuPair in auPairDuFichier:
-            n.write(uneAuPair.toString(sep) + '\n')
-        n.close()
+    rowSync = 1
+    for uneAuPair in auPairFromGoogle:
+        if ( uneAuPair.isToSync()):
+            #print("Sync to google " + uneAuPair.prenom + " ." + str(rowSync))
+            if ( uneAuPair.googleStatus == 'update'):
+                print("Update %s" % uneAuPair.prenom, " on line %d" % uneAuPair.googleLine)
+                auPairSheet.update_cell(uneAuPair.googleLine,2,uneAuPair.nationalite)
+                auPairSheet.update_cell(uneAuPair.googleLine,3,uneAuPair.age)
+                auPairSheet.update_cell(uneAuPair.googleLine,4,uneAuPair.status)
+                auPairSheet.update_cell(uneAuPair.googleLine,5,uneAuPair.quandStatus)
+            else:
+                print("Create %s" % uneAuPair.prenom, " at line %d" % googleNextRow)
+                row = [uneAuPair.prenom,uneAuPair.nationalite,uneAuPair.age,uneAuPair.status,uneAuPair.quandStatus,uneAuPair.pong,uneAuPair.quandPong,uneAuPair.commentaire,uneAuPair.url]
+                print(auPairSheet.insert_row(row,googleNextRow))
+                googleNextRow = googleNextRow + 1
+        rowSync = rowSync + 1
 
-    print("Renommage des fichiers pour garder [" + nomFichierHistorique + "] comme totale")
-    if ( os.path.isfile(nomFichierHistoriqueBackup) ):
-        os.remove(nomFichierHistoriqueBackup)
-    os.rename(nomFichierHistorique, nomFichierHistoriqueBackup)
-    os.rename(nomFichierNouveauTotal, nomFichierHistorique)
+    print("End of process")
