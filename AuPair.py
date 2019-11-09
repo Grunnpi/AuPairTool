@@ -183,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument('--pwd', help='Password', type=str)
     parser.add_argument('--proxy', help='https://uzer:pwd@name:port', type=str, default="")
     parser.add_argument('--spam', help='true', type=str, default="")
-    parser.add_argument('--path', help='true', type=str, default="")
+    parser.add_argument('--cred', help='true', type=str, default="")
     args=parser.parse_args()
 
     if args.proxy:
@@ -194,7 +194,6 @@ if __name__ == "__main__":
 
     #print(str(args.path))
 
-    rootPath = args.path
     payload = "userNameF=" + urllib.parse.quote(str(args.user)) + "&passwordF=" + str(args.pwd) + "&login=Login+%C2%BB"
     headers = {'content-type': 'application/x-www-form-urlencoded'}
 
@@ -219,7 +218,7 @@ if __name__ == "__main__":
 
     # use creds to create a client to interact with the Google Drive API
     scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('../AuPair.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(str(args.cred), scope)
     client = gspread.authorize(creds)
 
     # Find a workbook by name and open the first sheet
