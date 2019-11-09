@@ -8,6 +8,8 @@ from datetime import datetime
 import urllib.parse
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
+import telegram
+
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -184,6 +186,8 @@ if __name__ == "__main__":
     parser.add_argument('--proxy', help='https://uzer:pwd@name:port', type=str, default="")
     parser.add_argument('--spam', help='true', type=str, default="")
     parser.add_argument('--cred', help='true', type=str, default="")
+    parser.add_argument('--token', help='true', type=str, default="")
+    parser.add_argument('--chatid', help='true', type=str, default="")
     args=parser.parse_args()
 
     if args.proxy:
@@ -300,6 +304,8 @@ if __name__ == "__main__":
             extractDetail(maSession,uneAuPair,spamTodo,messageType)
 
     rowSync = 1
+    nbUpdate = 0
+    nbCreate = 0
     for uneAuPair in auPairFromGoogle:
         if ( uneAuPair.isToSync()):
             #print("Sync to google " + uneAuPair.prenom + " ." + str(rowSync))
@@ -309,11 +315,18 @@ if __name__ == "__main__":
                 auPairSheet.update_cell(uneAuPair.googleLine,3,uneAuPair.age)
                 auPairSheet.update_cell(uneAuPair.googleLine,4,uneAuPair.status)
                 auPairSheet.update_cell(uneAuPair.googleLine,5,uneAuPair.quandStatus)
+                nbUpdate = nbUpdate + 1
             else:
                 print("Create %s" % uneAuPair.prenom, " at line %d" % googleNextRow)
                 row = [uneAuPair.prenom,uneAuPair.nationalite,uneAuPair.age,uneAuPair.status,uneAuPair.quandStatus,uneAuPair.pong,uneAuPair.quandPong,uneAuPair.commentaire,uneAuPair.url]
                 print(auPairSheet.insert_row(row,googleNextRow))
                 googleNextRow = googleNextRow + 1
+                nbCreate = nbCreate + 1
         rowSync = rowSync + 1
+
+
+    bot = telegram.Bot(token=str(args.token))
+    bot.send_message(chat_id=str(args.chatid), text="*AuPair* _create_ `" + str(nbCreate) + "` / _update_ `" + str(nbUpdate) + "` / _total_ `" + str(len(auPairFromGoogle)) + "`", parse_mode=telegram.ParseMode.MARKDOWN)
+    #bot.send_document(chat_id=str(args.chatid), document=open('tests/test.zip', 'rb'))
 
     print("End of process")
