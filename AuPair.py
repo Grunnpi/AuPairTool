@@ -92,20 +92,22 @@ def extractDetail(maSession, uneAuPair, spamTodo,messageType):
             memberIdPersonal = formPersonal.find('input', {'name': 'memberId'}).get('value')
 
         memberIdStuff = soup.find('input', {'name': 'memberId'})
+        memberId = ""
         if ( memberIdStuff ):
             memberId = memberIdStuff.get('value')
         print(str(spamTodo) + " > spam[" + uneAuPair.prenom + "][" + uneAuPair.age + "][" + memberIdPersonal + "] for [" + uneAuPair.url + "]")
 
-        now = datetime.now() # current date and time
-        if ( spamTodo ):
-            sendMessage(maSession,memberId,memberIdPersonal,messageType)
-            uneAuPair.status = 'oui'
-            uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
-            uneAuPair.updated()
 
-def sendMessage(maSession,memberId,memberIdPersonal,messageType):
+        if ( spamTodo ):
+            sendMessage(maSession,uneAuPair, memberId,memberIdPersonal,messageType)
+
+
+def sendMessage(maSession,uneAuPair,memberId,memberIdPersonal,messageType):
+
+    spamDone = False
     memberId = False
     if (memberId):
+        spamDone = True
         payload = "memberId=" + requote_uri(memberId) + "&visaAllowed=1&message=" + messageType + "&freeRequest=Envoyer"
         headers = {'content-type': 'application/x-www-form-urlencoded'}
 
@@ -114,12 +116,21 @@ def sendMessage(maSession,memberId,memberIdPersonal,messageType):
         print("message-db",r.status_code, r.reason)
 
     if (memberIdPersonal):
+        spamDone = True
         payload = "memberId=" + requote_uri(memberIdPersonal) + "&message=" + messageType + "&Submit=Envoyer"
         headers = {'content-type': 'application/x-www-form-urlencoded'}
 
         r = maSession.post("https://www.aupair.com/send-user-personal-mail-db.php", data=payload, headers=headers, proxies=proxies, verify=False)
         #if r.status_code != 200:
         print("send-user",r.status_code, r.reason)
+
+    now = datetime.now() # current date and time
+    if ( spamDone ):
+        uneAuPair.status = 'oui'
+    else:
+        uneAuPair.status = 'spamFail'
+    uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
+    uneAuPair.updated()
 
 # extract search page summary info
 def extractionPage(maSession, page_number,auPairDuSite):
