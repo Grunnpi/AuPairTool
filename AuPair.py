@@ -18,7 +18,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 proxies = {}
 sep = ","
 
-auPairToolVersion = 'v2'
+auPairToolVersion = 'v3'
 
 class UneAuPair:
     "Notes"
@@ -128,10 +128,10 @@ def sendMessage(maSession,uneAuPair,memberId,memberIdPersonal,messageType):
 
     now = datetime.now() # current date and time
     if ( spamDone ):
-        uneAuPair.status = 'oui'
+        uneAuPair.ping = 'oui'
     else:
-        uneAuPair.status = 'spamFail'
-    uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
+        uneAuPair.ping = 'spamFail'
+    uneAuPair.quandPing = now.strftime("%Y-%m-%d")
     uneAuPair.updated()
 
 # extract search page summary info
