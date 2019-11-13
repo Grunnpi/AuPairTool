@@ -16,18 +16,20 @@ from oauth2client.service_account import ServiceAccountCredentials
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 proxies = {}
-
 sep = ","
+
+auPairToolVersion = 'v2'
 
 class UneAuPair:
     "Notes"
     prenom = ''
     age = ''
     nationalite = ''
-    status = ''
-    quandStatus = ''
+    ping = ''
+    quandPing = ''
     pong = ''
     quandPong = ''
+    status = ''
     commentaire = ''
     url = ''
     googleLine = -1
@@ -47,8 +49,8 @@ class UneAuPair:
         return self.prenom \
                + sep + self.nationalite \
                + sep + self.age \
-               + sep + self.status \
-               + sep + self.quandStatus \
+               + sep + self.ping \
+               + sep + self.quandPing \
                + sep + self.pong \
                + sep + self.quandPong \
                + sep + self.commentaire \
@@ -157,8 +159,8 @@ def extractionPage(maSession, page_number,auPairDuSite):
     #    #<div class="search_result_box aupairList">
     for auPair in mydivs:
         uneAuPair = UneAuPair()
-        uneAuPair.status = 'todo'
-        uneAuPair.quandStatus = now.strftime("%Y-%m-%d")
+        uneAuPair.ping = 'todo'
+        uneAuPair.quandPing = now.strftime("%Y-%m-%d")
         compteAuPair = compteAuPair + 1
         # if ( auPair.find("h4").find("b") ):
         #     print(auPair.find("h4").find("b"))
@@ -260,13 +262,15 @@ if __name__ == "__main__":
             if ( item[0] == 'Age'):
                 uneAuPair.age = readField(item[1], False)
             if ( item[0] == 'Ping'):
-                uneAuPair.status = readField(item[1], False)
+                uneAuPair.ping = readField(item[1], False)
             if ( item[0] == 'WhenPing'):
-                uneAuPair.quandStatus = readField(item[1], False)
+                uneAuPair.quandPing = readField(item[1], False)
             if ( item[0] == 'Pong'):
                 uneAuPair.pong = readField(item[1], False)
             if ( item[0] == 'WhenPong'):
                 uneAuPair.quandPong = readField(item[1], False)
+            if ( item[0] == 'Status'):
+                uneAuPair.status = readField(item[1], False)
             if ( item[0] == 'Comment'):
                 uneAuPair.commentaire = readField(item[1], False)
             if ( item[0] == 'URL'):
@@ -311,7 +315,7 @@ if __name__ == "__main__":
     #spam
     spamTodo = True
     for uneAuPair in auPairFromGoogle:
-        if ( uneAuPair.status == 'todo'):
+        if ( uneAuPair.ping == 'todo'):
             extractDetail(maSession,uneAuPair,spamTodo,messageType)
 
     rowSync = 1
@@ -324,12 +328,12 @@ if __name__ == "__main__":
                 print("Update %s" % uneAuPair.prenom, " on line %d" % uneAuPair.googleLine)
                 auPairSheet.update_cell(uneAuPair.googleLine,2,uneAuPair.nationalite)
                 auPairSheet.update_cell(uneAuPair.googleLine,3,uneAuPair.age)
-                auPairSheet.update_cell(uneAuPair.googleLine,4,uneAuPair.status)
-                auPairSheet.update_cell(uneAuPair.googleLine,5,uneAuPair.quandStatus)
+                auPairSheet.update_cell(uneAuPair.googleLine, 4, uneAuPair.ping)
+                auPairSheet.update_cell(uneAuPair.googleLine, 5, uneAuPair.quandPing)
                 nbUpdate = nbUpdate + 1
             else:
                 print("Create %s" % uneAuPair.prenom, " at line %d" % googleNextRow)
-                row = [uneAuPair.prenom,uneAuPair.nationalite,uneAuPair.age,uneAuPair.status,uneAuPair.quandStatus,uneAuPair.pong,uneAuPair.quandPong,uneAuPair.commentaire,uneAuPair.url]
+                row = [uneAuPair.prenom, uneAuPair.nationalite, uneAuPair.age, uneAuPair.ping, uneAuPair.quandPing, uneAuPair.pong, uneAuPair.quandPong, uneAuPair.status,  uneAuPair.commentaire, uneAuPair.url]
                 print(auPairSheet.insert_row(row,googleNextRow))
                 googleNextRow = googleNextRow + 1
                 nbCreate = nbCreate + 1
@@ -337,7 +341,7 @@ if __name__ == "__main__":
 
 
     bot = telegram.Bot(token=str(args.token))
-    bot.send_message(chat_id=str(args.chatid), text="*AuPair* _create_ `" + str(nbCreate) + "` / _update_ `" + str(nbUpdate) + "` / _total_ `" + str(len(auPairFromGoogle)) + "`", parse_mode=telegram.ParseMode.MARKDOWN)
+    bot.send_message(chat_id=str(args.chatid), text="*AuPair(" + auPairToolVersion + ")* _create_ `" + str(nbCreate) + "` / _update_ `" + str(nbUpdate) + "` / _total_ `" + str(len(auPairFromGoogle)) + "`", parse_mode=telegram.ParseMode.MARKDOWN)
     #bot.send_document(chat_id=str(args.chatid), document=open('tests/test.zip', 'rb'))
 
     print("End of process")
