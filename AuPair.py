@@ -201,6 +201,7 @@ if __name__ == "__main__":
     parser.add_argument('--cred', help='true', type=str, default="")
     parser.add_argument('--token', help='true', type=str, default="")
     parser.add_argument('--chatid', help='true', type=str, default="")
+    parser.add_argument('--telegram', help='true', type=str, default="no")
     args=parser.parse_args()
 
     if args.proxy:
@@ -340,8 +341,9 @@ if __name__ == "__main__":
         rowSync = rowSync + 1
 
 
-    bot = telegram.Bot(token=str(args.token))
-    bot.send_message(chat_id=str(args.chatid), text="*AuPair(" + auPairToolVersion + ")* _create_ `" + str(nbCreate) + "` / _update_ `" + str(nbUpdate) + "` / _total_ `" + str(len(auPairFromGoogle)) + "`", parse_mode=telegram.ParseMode.MARKDOWN)
-    #bot.send_document(chat_id=str(args.chatid), document=open('tests/test.zip', 'rb'))
+    if ( str(args.pwd) == "yes" ) :
+        bot = telegram.Bot(token=str(args.token))
+        bot.send_message(chat_id=str(args.chatid), text="*AuPair(" + auPairToolVersion + ")* _create_ `" + str(nbCreate) + "` / _update_ `" + str(nbUpdate) + "` / _total_ `" + str(len(auPairFromGoogle)) + "`", parse_mode=telegram.ParseMode.MARKDOWN)
+        #bot.send_document(chat_id=str(args.chatid), document=open('tests/test.zip', 'rb'))
 
     print("End of process")
